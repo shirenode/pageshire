@@ -10,10 +10,16 @@
   <div class="container">
     <div class="header">
       <h1>PDF Toolbox</h1>
-      <button type="button" id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
-        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
-        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      </button>
+      <div class="header-actions">
+        <button type="button" id="accountBtn" class="icon-action" aria-label="Account" aria-haspopup="dialog">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span id="accountLabel" class="account-label">Sign in</span>
+        </button>
+        <button type="button" id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="tab-bar" role="tablist">
@@ -67,7 +73,91 @@
       <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
       <p id="progressText">Uploading… 0%</p>
     </div>
+
+    <footer class="footer">
+      Powered by <a href="https://nodeshire.com" target="_blank" rel="noopener">Nodeshire</a>
+    </footer>
   </div>
+
+  <!-- Auth modal -->
+  <div id="authModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-content">
+      <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
+      <h2 id="authTitle">Sign in</h2>
+      <p class="modal-sub" id="authSub">Enter your email and password.</p>
+      <form id="authForm">
+        <input type="email" id="authEmail" placeholder="you@example.com" required autocomplete="email" />
+        <input type="password" id="authPassword" placeholder="Password (min 6 chars)" required minlength="6" autocomplete="current-password" />
+        <button type="submit" class="btn btn-primary" id="authSubmit">Sign in</button>
+      </form>
+      <p class="modal-toggle">
+        <span id="authToggleText">Don't have an account?</span>
+        <button type="button" id="authToggleBtn" class="link-btn">Create one</button>
+      </p>
+      <p id="authMsg" class="modal-msg hidden"></p>
+    </div>
+  </div>
+
+  <!-- Paywall modal -->
+  <div id="paywallModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="paywallTitle">
+    <div class="modal-content">
+      <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
+      <h2 id="paywallTitle">You've used your free merges</h2>
+      <p class="modal-sub" id="paywallSub">Sign in and upgrade to Pro for unlimited merges and conversions.</p>
+      <div class="paywall-actions">
+        <button type="button" id="paywallSignIn" class="btn btn-secondary">Sign in</button>
+        <button type="button" id="paywallUpgrade" class="btn btn-primary">Upgrade to Pro</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account modal -->
+  <div id="accountModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+    <div class="modal-content">
+      <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
+      <h2 id="accountTitle">Account</h2>
+      <p class="modal-sub" id="accountEmail"></p>
+      <p class="modal-sub" id="accountUsage"></p>
+
+      <h3 class="section-title">Profile</h3>
+      <form id="profileForm" class="stack">
+        <label class="field">
+          <span>Display name</span>
+          <input type="text" id="profileName" placeholder="Your name" autocomplete="name" />
+        </label>
+        <button type="submit" class="btn btn-primary" id="profileSubmit">Save name</button>
+      </form>
+      <p id="profileMsg" class="modal-msg hidden"></p>
+
+      <h3 class="section-title">Change password</h3>
+      <form id="passwordForm" class="stack">
+        <label class="field">
+          <span>New password</span>
+          <input type="password" id="newPassword" placeholder="Min 6 characters" minlength="6" autocomplete="new-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary" id="passwordSubmit">Update password</button>
+      </form>
+      <p id="passwordMsg" class="modal-msg hidden"></p>
+
+      <button type="button" id="signOutBtn" class="btn btn-secondary signout-btn">Sign out</button>
+
+      <div id="adminSection" class="admin-section hidden">
+        <h3 class="section-title">Admin · Manage admins</h3>
+        <p class="modal-sub">Admins bypass all usage limits.</p>
+        <ul id="adminList" class="admin-list"></ul>
+        <form id="adminAddForm" class="stack">
+          <label class="field">
+            <span>Add admin by email</span>
+            <input type="email" id="adminNewEmail" placeholder="someone@example.com" required />
+          </label>
+          <button type="submit" class="btn btn-primary" id="adminAddSubmit">Add admin</button>
+        </form>
+        <p id="adminMsg" class="modal-msg hidden"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <script>
     const dropZone = document.getElementById('dropZone');
@@ -96,6 +186,361 @@
     let activeXhr = null;
 
     const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
+
+    // ---- Auth + paywall state ----
+    let appConfig = { supabaseUrl: '', supabaseAnonKey: '', freeMergeLimit: 2, usageWindowHours: 24, upgradeUrl: '' };
+    let supabaseClient = null;
+    let currentUser = null;
+    let usageState = { used: 0, remaining: null, resetsAt: null, isPro: false };
+    const ANON_USAGE_KEY = 'pdfToolbox.anonMergeCount';
+
+    const accountBtn = document.getElementById('accountBtn');
+    const accountLabel = document.getElementById('accountLabel');
+    const authModal = document.getElementById('authModal');
+    const authForm = document.getElementById('authForm');
+    const authEmail = document.getElementById('authEmail');
+    const authPassword = document.getElementById('authPassword');
+    const authSubmit = document.getElementById('authSubmit');
+    const authMsg = document.getElementById('authMsg');
+    const authTitle = document.getElementById('authTitle');
+    const authSub = document.getElementById('authSub');
+    const authToggleText = document.getElementById('authToggleText');
+    const authToggleBtn = document.getElementById('authToggleBtn');
+    const paywallModal = document.getElementById('paywallModal');
+    const paywallSub = document.getElementById('paywallSub');
+    const paywallSignIn = document.getElementById('paywallSignIn');
+    const paywallUpgrade = document.getElementById('paywallUpgrade');
+
+    let authMode = 'signin'; // 'signin' | 'signup'
+    function setAuthMode(m) {
+      authMode = m;
+      if (m === 'signin') {
+        authTitle.textContent = 'Sign in';
+        authSub.textContent = 'Enter your email and password.';
+        authSubmit.textContent = 'Sign in';
+        authPassword.autocomplete = 'current-password';
+        authToggleText.textContent = "Don't have an account?";
+        authToggleBtn.textContent = 'Create one';
+      } else {
+        authTitle.textContent = 'Create account';
+        authSub.textContent = 'Sign up with email and password.';
+        authSubmit.textContent = 'Create account';
+        authPassword.autocomplete = 'new-password';
+        authToggleText.textContent = 'Already have an account?';
+        authToggleBtn.textContent = 'Sign in';
+      }
+      authMsg.classList.add('hidden');
+    }
+    authToggleBtn.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
+
+    function getMergeCount() {
+      return Number(localStorage.getItem(ANON_USAGE_KEY) || 0);
+    }
+    function incrementMergeCount() {
+      localStorage.setItem(ANON_USAGE_KEY, String(getMergeCount() + 1));
+    }
+    function isPro() {
+      if (usageState.isPro) return true;
+      return !!(currentUser && (currentUser.user_metadata?.pro || currentUser.app_metadata?.pro));
+    }
+    async function refreshUsage() {
+      if (!currentUser || !supabaseClient) return;
+      const { data, error } = await supabaseClient.rpc('get_usage', {
+        limit_count: appConfig.freeMergeLimit,
+        window_hours: appConfig.usageWindowHours,
+      });
+      if (error) { console.warn('get_usage failed', error); return; }
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
+        usageState = {
+          used: row.used,
+          remaining: row.remaining,
+          resetsAt: row.resets_at,
+          isPro: row.is_pro,
+        };
+        updateAccountUI();
+      }
+    }
+    async function tryConsumeUsage() {
+      // Pre-flight only: server is the source of truth and will atomically increment.
+      if (!currentUser) {
+        if (getMergeCount() >= appConfig.freeMergeLimit) return { allowed: false };
+        return { allowed: true, anon: true };
+      }
+      if (isPro()) return { allowed: true };
+      if (usageState.remaining !== null && usageState.remaining <= 0) {
+        return { allowed: false, resetsAt: usageState.resetsAt };
+      }
+      return { allowed: true };
+    }
+    function formatResetTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = d - now;
+      if (diffMs <= 0) return 'now';
+      const hours = Math.floor(diffMs / 3600000);
+      const mins = Math.floor((diffMs % 3600000) / 60000);
+      if (hours > 0) return `in ${hours}h ${mins}m`;
+      return `in ${mins}m`;
+    }
+
+    function openModal(el) { el.classList.remove('hidden'); }
+    function closeModal(el) { el.classList.add('hidden'); }
+    document.querySelectorAll('[data-close-modal]').forEach(btn => {
+      btn.addEventListener('click', () => closeModal(btn.closest('.modal')));
+    });
+    [authModal, paywallModal].forEach(m => {
+      m.addEventListener('click', e => { if (e.target === m) closeModal(m); });
+    });
+
+    function updateAccountUI() {
+      if (currentUser) {
+        const name = currentUser.user_metadata?.name;
+        const email = currentUser.email || 'Account';
+        const display = name || email;
+        accountLabel.textContent = display.length > 22 ? display.slice(0, 20) + '…' : display;
+        accountBtn.title = isPro() ? `${email} (Pro)` : email;
+      } else {
+        accountLabel.textContent = 'Sign in';
+        accountBtn.title = 'Sign in';
+      }
+    }
+
+    accountBtn.addEventListener('click', () => {
+      if (currentUser && supabaseClient) {
+        openAccountModal();
+        return;
+      }
+      authMsg.classList.add('hidden');
+      authEmail.value = '';
+      authPassword.value = '';
+      setAuthMode('signin');
+      openModal(authModal);
+      setTimeout(() => authEmail.focus(), 50);
+    });
+
+    authForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!supabaseClient) {
+        authMsg.textContent = 'Authentication is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY on the server.';
+        authMsg.classList.remove('hidden');
+        return;
+      }
+      authSubmit.disabled = true;
+      authMsg.classList.add('hidden');
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+      let result;
+      if (authMode === 'signup') {
+        result = await supabaseClient.auth.signUp({ email, password });
+      } else {
+        result = await supabaseClient.auth.signInWithPassword({ email, password });
+      }
+      authSubmit.disabled = false;
+      const { data, error } = result;
+      if (error) {
+        authMsg.textContent = error.message;
+        authMsg.classList.remove('hidden');
+        return;
+      }
+      if (authMode === 'signup' && !data.session) {
+        // Email confirmations are enabled — user must verify before logging in.
+        authMsg.textContent = 'Account created. Check your email to confirm, then sign in.';
+        authMsg.classList.remove('hidden');
+        setAuthMode('signin');
+      }
+      // onAuthStateChange will close the modal once a session exists.
+    });
+
+    paywallSignIn.addEventListener('click', () => {
+      closeModal(paywallModal);
+      openModal(authModal);
+      setTimeout(() => authEmail.focus(), 50);
+    });
+    paywallUpgrade.addEventListener('click', () => {
+      if (appConfig.upgradeUrl) {
+        window.open(appConfig.upgradeUrl, '_blank', 'noopener');
+      } else {
+        alert('Upgrade flow not configured. Set UPGRADE_URL on the server (e.g. a Stripe Checkout link).');
+      }
+    });
+
+    function showPaywall(serverDeniedResetsAt) {
+      let sub;
+      if (serverDeniedResetsAt) {
+        sub = `You've used all ${appConfig.freeMergeLimit} free merges. Limit resets ${formatResetTime(serverDeniedResetsAt)}. Upgrade to Pro for unlimited usage.`;
+      } else if (currentUser) {
+        sub = `You've used all ${appConfig.freeMergeLimit} free merges in the last ${appConfig.usageWindowHours}h. Upgrade to Pro for unlimited merges and conversions.`;
+      } else {
+        sub = `You've used your ${appConfig.freeMergeLimit} free merges. Sign in to get ${appConfig.freeMergeLimit} more every ${appConfig.usageWindowHours}h, or upgrade to Pro for unlimited usage.`;
+      }
+      paywallSub.textContent = sub;
+      paywallSignIn.classList.toggle('hidden', !!currentUser);
+      openModal(paywallModal);
+    }
+
+    // ---- Account modal ----
+    const accountModal = document.getElementById('accountModal');
+    const accountEmailEl = document.getElementById('accountEmail');
+    const accountUsageEl = document.getElementById('accountUsage');
+    const profileForm = document.getElementById('profileForm');
+    const profileName = document.getElementById('profileName');
+    const profileSubmit = document.getElementById('profileSubmit');
+    const profileMsg = document.getElementById('profileMsg');
+    const passwordForm = document.getElementById('passwordForm');
+    const newPassword = document.getElementById('newPassword');
+    const passwordSubmit = document.getElementById('passwordSubmit');
+    const passwordMsg = document.getElementById('passwordMsg');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    async function openAccountModal() {
+      if (!currentUser) return;
+      accountEmailEl.textContent = currentUser.email || '';
+      profileName.value = currentUser.user_metadata?.name || '';
+      profileMsg.classList.add('hidden');
+      passwordMsg.classList.add('hidden');
+      newPassword.value = '';
+      await refreshUsage();
+      if (isPro()) {
+        accountUsageEl.textContent = 'Pro plan — unlimited merges.';
+      } else {
+        const remaining = usageState.remaining ?? appConfig.freeMergeLimit;
+        const reset = usageState.resetsAt ? ` Resets ${formatResetTime(usageState.resetsAt)}.` : '';
+        accountUsageEl.textContent = `Free plan — ${remaining} of ${appConfig.freeMergeLimit} merges left in this ${appConfig.usageWindowHours}h window.${reset}`;
+      }
+      maybeShowAdminSection();
+      openModal(accountModal);
+    }
+
+    profileForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      profileMsg.classList.add('hidden');
+      profileSubmit.disabled = true;
+      const { data, error } = await supabaseClient.auth.updateUser({
+        data: { name: profileName.value.trim() },
+      });
+      profileSubmit.disabled = false;
+      if (error) {
+        profileMsg.textContent = error.message;
+      } else {
+        currentUser = data.user;
+        updateAccountUI();
+        profileMsg.textContent = 'Name updated.';
+      }
+      profileMsg.classList.remove('hidden');
+    });
+
+    passwordForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      passwordMsg.classList.add('hidden');
+      passwordSubmit.disabled = true;
+      const { error } = await supabaseClient.auth.updateUser({ password: newPassword.value });
+      passwordSubmit.disabled = false;
+      if (error) {
+        passwordMsg.textContent = error.message;
+      } else {
+        passwordMsg.textContent = 'Password updated.';
+        newPassword.value = '';
+      }
+      passwordMsg.classList.remove('hidden');
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      await supabaseClient.auth.signOut();
+      closeModal(accountModal);
+    });
+
+    // ---- Admin management ----
+    const adminSection = document.getElementById('adminSection');
+    const adminList = document.getElementById('adminList');
+    const adminAddForm = document.getElementById('adminAddForm');
+    const adminNewEmail = document.getElementById('adminNewEmail');
+    const adminAddSubmit = document.getElementById('adminAddSubmit');
+    const adminMsg = document.getElementById('adminMsg');
+
+    async function refreshAdmins() {
+      adminList.innerHTML = '';
+      const { data, error } = await supabaseClient.rpc('list_admins');
+      if (error) {
+        adminMsg.textContent = error.message;
+        adminMsg.classList.remove('hidden');
+        return;
+      }
+      (data || []).forEach(row => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = row.email;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'remove-btn';
+        rm.textContent = '×';
+        rm.title = 'Remove admin';
+        rm.addEventListener('click', async () => {
+          if (!confirm(`Remove ${row.email} as admin?`)) return;
+          const { error: e2 } = await supabaseClient.rpc('remove_admin', { target_email: row.email });
+          if (e2) {
+            adminMsg.textContent = e2.message;
+            adminMsg.classList.remove('hidden');
+          } else {
+            adminMsg.classList.add('hidden');
+            refreshAdmins();
+          }
+        });
+        li.append(span, rm);
+        adminList.appendChild(li);
+      });
+    }
+
+    adminAddForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      adminMsg.classList.add('hidden');
+      adminAddSubmit.disabled = true;
+      const { error } = await supabaseClient.rpc('add_admin', { new_email: adminNewEmail.value.trim() });
+      adminAddSubmit.disabled = false;
+      if (error) {
+        adminMsg.textContent = error.message;
+        adminMsg.classList.remove('hidden');
+      } else {
+        adminNewEmail.value = '';
+        refreshAdmins();
+      }
+    });
+
+    async function maybeShowAdminSection() {
+      if (!currentUser) { adminSection.classList.add('hidden'); return; }
+      const { data, error } = await supabaseClient.rpc('is_admin');
+      if (error || !data) { adminSection.classList.add('hidden'); return; }
+      adminSection.classList.remove('hidden');
+      refreshAdmins();
+    }
+
+    async function initAuth() {
+      try {
+        const res = await fetch('/config');
+        appConfig = await res.json();
+      } catch { /* ignore */ }
+      if (!appConfig.supabaseUrl || !appConfig.supabaseAnonKey || !window.supabase) {
+        updateAccountUI();
+        return;
+      }
+      supabaseClient = window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey);
+      const { data } = await supabaseClient.auth.getSession();
+      currentUser = data?.session?.user || null;
+      updateAccountUI();
+      if (currentUser) refreshUsage();
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        currentUser = session?.user || null;
+        updateAccountUI();
+        if (currentUser) {
+          closeModal(authModal);
+          refreshUsage();
+        } else {
+          usageState = { used: 0, remaining: null, resetsAt: null, isPro: false };
+        }
+      });
+    }
+    initAuth();
 
     const modeConfig = {
       merge: {
@@ -317,7 +762,7 @@
         selectedFiles.length < modeConfig[mode].minFiles || total > MAX_TOTAL_BYTES;
     }
 
-    actionBtn.addEventListener('click', () => {
+    actionBtn.addEventListener('click', async () => {
       hideError();
       const cfg = modeConfig[mode];
       if (selectedFiles.length < cfg.minFiles) {
@@ -329,6 +774,14 @@
         showError('Total size exceeds 200 MB. Please remove some files.');
         return;
       }
+
+      // Atomic server-side check (or localStorage fallback for anon users).
+      const gate = await tryConsumeUsage();
+      if (!gate.allowed) {
+        showPaywall(gate.resetsAt);
+        return;
+      }
+      const consumedAnon = !!gate.anon;
 
       const formData = new FormData();
       selectedFiles.forEach(e => formData.append('files', e.file));
@@ -342,6 +795,13 @@
       activeXhr = xhr;
       xhr.open('POST', endpoint);
       xhr.responseType = 'blob';
+
+      // Attach Supabase JWT so the server can identify the user for the usage gate.
+      if (currentUser && supabaseClient) {
+        const { data: sess } = await supabaseClient.auth.getSession();
+        const token = sess?.session?.access_token;
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
 
       xhr.upload.addEventListener('progress', e => {
         if (!e.lengthComputable) return;
@@ -370,6 +830,17 @@
           a.click();
           a.remove();
           URL.revokeObjectURL(url);
+          if (consumedAnon) incrementMergeCount();
+          if (currentUser) refreshUsage();
+        } else if (xhr.status === 402) {
+          // Server-side paywall response.
+          let resetsAt = null;
+          try {
+            const text = await xhr.response.text();
+            resetsAt = JSON.parse(text).resetsAt;
+          } catch { /* ignore */ }
+          showPaywall(resetsAt);
+          if (currentUser) refreshUsage();
         } else {
           let message = 'Request failed.';
           try {
