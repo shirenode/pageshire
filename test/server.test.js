@@ -4,6 +4,7 @@ const assert = require("assert");
 const { test } = require("node:test");
 const request = require("supertest");
 const { PDFDocument } = require("pdf-lib");
+process.env.FREE_MERGE_LIMIT = process.env.FREE_MERGE_LIMIT || "10000";
 const { app } = require("../server");
 
 async function makePdfBuffer(pageCount = 1) {
@@ -78,4 +79,25 @@ test("POST /convert validates pageSize", async () => {
     .post("/convert?pageSize=garbage")
     .attach("files", png, { filename: "img.png", contentType: "image/png" });
   assert.strictEqual(res.status, 400);
+});
+
+test("POST /merge rejects file with PDF extension but non-PDF content (magic-byte check)", async () => {
+  // Buffer claiming to be a PDF but actually plain text \u2014 must be rejected even though mimetype/extension say PDF.
+  const fakePdf = Buffer.from("Not a real PDF, just text masquerading as one");
+  const realPdf = await makePdfBuffer(1);
+  const res = await request(app)
+    .post("/merge")
+    .attach("files", fakePdf, { filename: "fake.pdf", contentType: "application/pdf" })
+    .attach("files", realPdf, { filename: "real.pdf", contentType: "application/pdf" });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.body.error, /not a valid PDF/);
+});
+
+test("POST /convert rejects file with image extension but non-image content (magic-byte check)", async () => {
+  const fakePng = Buffer.from("This is not a PNG");
+  const res = await request(app)
+    .post("/convert")
+    .attach("files", fakePng, { filename: "fake.png", contentType: "image/png" });
+  assert.strictEqual(res.status, 400);
+  assert.match(res.body.error, /not a valid PNG or JPEG/);
 });
