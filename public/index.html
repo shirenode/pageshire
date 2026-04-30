@@ -94,6 +94,9 @@
         <span id="authToggleText">Don't have an account?</span>
         <button type="button" id="authToggleBtn" class="link-btn">Create one</button>
       </p>
+      <p class="modal-toggle">
+        <button type="button" id="authForgotBtn" class="link-btn">Forgot password?</button>
+      </p>
       <p id="authMsg" class="modal-msg hidden"></p>
     </div>
   </div>
@@ -353,6 +356,24 @@
       // onAuthStateChange will close the modal once a session exists.
     });
 
+    document.getElementById('authForgotBtn').addEventListener('click', async () => {
+      if (!supabaseClient) return;
+      const email = authEmail.value.trim();
+      if (!email) {
+        authMsg.textContent = 'Enter your email above first, then click "Forgot password?".';
+        authMsg.classList.remove('hidden');
+        authEmail.focus();
+        return;
+      }
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+      });
+      authMsg.textContent = error
+        ? error.message
+        : 'If an account exists for that email, a password reset link has been sent.';
+      authMsg.classList.remove('hidden');
+    });
+
     paywallSignIn.addEventListener('click', () => {
       closeModal(paywallModal);
       openModal(authModal);
@@ -529,12 +550,20 @@
       currentUser = data?.session?.user || null;
       updateAccountUI();
       if (currentUser) refreshUsage();
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
+      supabaseClient.auth.onAuthStateChange((event, session) => {
         currentUser = session?.user || null;
         updateAccountUI();
         if (currentUser) {
           closeModal(authModal);
           refreshUsage();
+          if (event === 'PASSWORD_RECOVERY') {
+            // User clicked the password-reset link in their email \u2014 take them straight to the password form.
+            openAccountModal();
+            setTimeout(() => {
+              const f = document.getElementById('newPassword');
+              if (f) f.focus();
+            }, 50);
+          }
         } else {
           usageState = { used: 0, remaining: null, resetsAt: null, isPro: false };
         }

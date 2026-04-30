@@ -14,10 +14,33 @@ const MAX_TOTAL_BYTES = Number(process.env.MAX_TOTAL_BYTES) || 200 * 1024 * 1024
 const MAX_FILES = Number(process.env.MAX_FILES) || 50;
 const FREE_MERGE_LIMIT = Number(process.env.FREE_MERGE_LIMIT) || 2;
 const USAGE_WINDOW_HOURS = Number(process.env.USAGE_WINDOW_HOURS) || 24;
+const MAX_PAGES_PER_FILE = Number(process.env.MAX_PAGES_PER_FILE) || 2000;
+const MAX_PAGES_PER_REQUEST = Number(process.env.MAX_PAGES_PER_REQUEST) || 5000;
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const ALLOWED_MIME = new Set(["application/pdf", "image/png", "image/jpeg"]);
+
+// Detect actual file type from magic bytes — never trust client-supplied mimetype.
+function sniffMime(buf) {
+  if (!buf || buf.length < 4) return null;
+  // PDF: "%PDF-"
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46 && buf[4] === 0x2d) {
+    return "application/pdf";
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
+    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  return null;
+}
 
 const PAGE_SIZES = {
   fit: null,
@@ -223,14 +246,29 @@ app.post("/merge", limiter, attachReqId, upload.array("files", MAX_FILES), usage
       return res.status(413).json({ error: "Total upload size exceeds the limit." });
     }
     for (const file of files) {
-      if (file.mimetype !== "application/pdf") {
-        return res.status(400).json({ error: "Only PDF files are accepted for merging." });
+      const actual = sniffMime(file.buffer);
+      if (actual !== "application/pdf") {
+        return res.status(400).json({ error: `File "${file.originalname}" is not a valid PDF.` });
       }
     }
 
     const mergedPdf = await PDFDocument.create();
+    let totalPages = 0;
     for (const file of files) {
-      const sourcePdf = await PDFDocument.load(file.buffer);
+      let sourcePdf;
+      try {
+        sourcePdf = await PDFDocument.load(file.buffer, { ignoreEncryption: false });
+      } catch (e) {
+        return res.status(400).json({ error: `Could not parse "${file.originalname}". It may be encrypted or corrupted.` });
+      }
+      const pageCount = sourcePdf.getPageCount();
+      if (pageCount > MAX_PAGES_PER_FILE) {
+        return res.status(413).json({ error: `"${file.originalname}" has ${pageCount} pages (max ${MAX_PAGES_PER_FILE} per file).` });
+      }
+      totalPages += pageCount;
+      if (totalPages > MAX_PAGES_PER_REQUEST) {
+        return res.status(413).json({ error: `Combined page count exceeds the limit of ${MAX_PAGES_PER_REQUEST}.` });
+      }
       const pages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
       for (const page of pages) mergedPdf.addPage(page);
     }
@@ -258,10 +296,16 @@ app.post("/convert", limiter, attachReqId, upload.array("files", MAX_FILES), usa
     if (totalSize(files) > MAX_TOTAL_BYTES) {
       return res.status(413).json({ error: "Total upload size exceeds the limit." });
     }
+    if (files.length > MAX_PAGES_PER_REQUEST) {
+      return res.status(413).json({ error: `Too many images (max ${MAX_PAGES_PER_REQUEST}).` });
+    }
     for (const file of files) {
-      if (file.mimetype !== "image/png" && file.mimetype !== "image/jpeg") {
-        return res.status(400).json({ error: "Only PNG or JPEG images are accepted for conversion." });
+      const actual = sniffMime(file.buffer);
+      if (actual !== "image/png" && actual !== "image/jpeg") {
+        return res.status(400).json({ error: `File "${file.originalname}" is not a valid PNG or JPEG image.` });
       }
+      // Re-tag with sniffed type so downstream embed picks the right decoder.
+      file.mimetype = actual;
     }
 
     const pageSize = (req.query.pageSize || "fit").toLowerCase();
