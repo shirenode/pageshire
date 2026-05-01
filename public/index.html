@@ -23,8 +23,9 @@
     </div>
 
     <div class="tab-bar" role="tablist">
-      <button type="button" class="tab active" data-mode="merge" role="tab" aria-selected="true">Merge PDFs</button>
-      <button type="button" class="tab" data-mode="image2pdf" role="tab" aria-selected="false">Image → PDF</button>
+      <button type="button" class="tab active" data-mode="merge" role="tab" aria-selected="true" data-i18n="tab.merge">Merge PDFs</button>
+      <button type="button" class="tab" data-mode="image2pdf" role="tab" aria-selected="false" data-i18n="tab.image2pdf">Image → PDF</button>
+      <button type="button" class="tab" data-mode="edit" role="tab" aria-selected="false" data-i18n="tab.edit">Edit PDF</button>
     </div>
     <p class="subtitle" id="subtitle">Upload two or more PDF files, reorder them, and merge into one.</p>
 
@@ -39,7 +40,33 @@
         <p id="dropText">Drag &amp; drop PDF files here</p>
         <p id="dropHint" class="hint">or click to browse PDF files</p>
       </div>
-      <input type="file" id="fileInput" multiple accept="application/pdf" />
+      <input type="file" id="fileInput" multiple accept="application/pdf" webkitdirectory="false" />
+    </div>
+
+    <!-- Edit-mode pane: page thumbnails + per-page actions -->
+    <div id="editPane" class="edit-pane hidden">
+      <div class="edit-toolbar">
+        <button type="button" id="editSelectAll" class="btn btn-secondary btn-sm" data-i18n="edit.selectAll">Select all</button>
+        <button type="button" id="editClearSel" class="btn btn-secondary btn-sm" data-i18n="edit.clearSel">Clear selection</button>
+        <button type="button" id="editRotateSel" class="btn btn-secondary btn-sm" data-i18n="edit.rotate">Rotate 90°</button>
+        <button type="button" id="editDeleteSel" class="btn btn-secondary btn-sm" data-i18n="edit.delete">Delete</button>
+      </div>
+      <p class="hint" data-i18n="edit.dragHint">Drag thumbnails to reorder. Click to select. Use the buttons above to rotate or delete selected pages.</p>
+      <div id="editGrid" class="edit-grid"></div>
+      <div class="edit-options">
+        <label class="field">
+          <span data-i18n="edit.watermark">Watermark text (optional)</span>
+          <input type="text" id="editWatermark" maxlength="100" placeholder="e.g. CONFIDENTIAL" />
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="editPageNumbers" />
+          <span data-i18n="edit.pageNumbers">Add page numbers</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="editCompress" />
+          <span data-i18n="edit.compress">Compress (object streams)</span>
+        </label>
+      </div>
     </div>
 
     <div id="options" class="options hidden">
@@ -61,6 +88,17 @@
     </div>
 
     <div id="errorMsg" class="error hidden" role="alert"></div>
+
+    <div class="filename-row">
+      <label class="field">
+        <span data-i18n="output.filename">Output filename</span>
+        <input type="text" id="outputName" maxlength="80" placeholder="merged.pdf" autocomplete="off" />
+      </label>
+      <label class="checkbox-row merge-compress hidden" id="mergeCompressRow">
+        <input type="checkbox" id="mergeCompress" />
+        <span data-i18n="merge.compress">Compress output</span>
+      </label>
+    </div>
 
     <div class="action-row">
       <button type="button" id="actionBtn" class="btn btn-primary" disabled>
@@ -121,6 +159,28 @@
       <h2 id="accountTitle">Account</h2>
       <p class="modal-sub" id="accountEmail"></p>
       <p class="modal-sub" id="accountUsage"></p>
+      <div id="usageBar" class="usage-bar hidden" aria-hidden="true">
+        <div id="usageBarFill" class="usage-bar-fill"></div>
+      </div>
+
+      <h3 class="section-title" data-i18n="account.preferences">Preferences</h3>
+      <div class="stack">
+        <label class="field">
+          <span data-i18n="account.language">Language</span>
+          <select id="languageSelect">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+          </select>
+        </label>
+        <label class="field">
+          <span data-i18n="account.theme">Theme</span>
+          <select id="themeSelect">
+            <option value="system" data-i18n="theme.system">System</option>
+            <option value="light" data-i18n="theme.light">Light</option>
+            <option value="dark" data-i18n="theme.dark">Dark</option>
+          </select>
+        </label>
+      </div>
 
       <h3 class="section-title">Profile</h3>
       <form id="profileForm" class="stack">
@@ -142,7 +202,11 @@
       </form>
       <p id="passwordMsg" class="modal-msg hidden"></p>
 
-      <button type="button" id="signOutBtn" class="btn btn-secondary signout-btn">Sign out</button>
+      <button type="button" id="signOutBtn" class="btn btn-secondary signout-btn" data-i18n="account.signOut">Sign out</button>
+
+      <h3 class="section-title" data-i18n="account.history">Recent activity</h3>
+      <ul id="historyList" class="history-list"></ul>
+      <p id="historyEmpty" class="hint hidden" data-i18n="account.historyEmpty">No operations yet. Merge or convert a PDF to see it here.</p>
 
       <div id="adminSection" class="admin-section hidden">
         <h3 class="section-title">Admin · Manage admins</h3>
@@ -157,10 +221,16 @@
         </form>
         <p id="adminMsg" class="modal-msg hidden"></p>
       </div>
+
+      <h3 class="section-title danger" data-i18n="account.dangerZone">Danger zone</h3>
+      <button type="button" id="deleteAccountBtn" class="btn btn-danger" data-i18n="account.deleteAccount">Delete my account</button>
+      <p class="hint" data-i18n="account.deleteHint">This permanently deletes your account, history, and usage data. Cannot be undone.</p>
+      <p id="deleteMsg" class="modal-msg hidden"></p>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs" type="module"></script>
 
   <script>
     const dropZone = document.getElementById('dropZone');
@@ -182,6 +252,68 @@
     const optionsBox = document.getElementById('options');
     const pageSizeSelect = document.getElementById('pageSize');
     const tabs = document.querySelectorAll('.tab');
+
+    // ---- v2 elements & state ----
+    const outputName = document.getElementById('outputName');
+    const mergeCompressRow = document.getElementById('mergeCompressRow');
+    const mergeCompress = document.getElementById('mergeCompress');
+    const editPane = document.getElementById('editPane');
+    const editGrid = document.getElementById('editGrid');
+    const editWatermark = document.getElementById('editWatermark');
+    const editPageNumbers = document.getElementById('editPageNumbers');
+    const editCompress = document.getElementById('editCompress');
+    let editPdfBuffer = null;        // ArrayBuffer of the uploaded PDF
+    let editPages = [];              // [{ originalIndex, rotation, canvas }]
+    let editSelection = new Set();   // current selected indices into editPages
+
+    // ---- i18n ----
+    const I18N = {
+      en: {
+        'tab.merge': 'Merge PDFs', 'tab.image2pdf': 'Image \u2192 PDF', 'tab.edit': 'Edit PDF',
+        'output.filename': 'Output filename',
+        'merge.compress': 'Compress output',
+        'edit.selectAll': 'Select all', 'edit.clearSel': 'Clear selection',
+        'edit.rotate': 'Rotate 90\u00b0', 'edit.delete': 'Delete',
+        'edit.dragHint': 'Drag thumbnails to reorder. Click to select. Use the buttons above to rotate or delete selected pages.',
+        'edit.watermark': 'Watermark text (optional)',
+        'edit.pageNumbers': 'Add page numbers',
+        'edit.compress': 'Compress (object streams)',
+        'account.preferences': 'Preferences', 'account.language': 'Language', 'account.theme': 'Theme',
+        'theme.system': 'System', 'theme.light': 'Light', 'theme.dark': 'Dark',
+        'account.signOut': 'Sign out',
+        'account.history': 'Recent activity',
+        'account.historyEmpty': 'No operations yet. Merge or convert a PDF to see it here.',
+        'account.dangerZone': 'Danger zone', 'account.deleteAccount': 'Delete my account',
+        'account.deleteHint': 'This permanently deletes your account, history, and usage data. Cannot be undone.',
+      },
+      es: {
+        'tab.merge': 'Unir PDFs', 'tab.image2pdf': 'Imagen \u2192 PDF', 'tab.edit': 'Editar PDF',
+        'output.filename': 'Nombre del archivo',
+        'merge.compress': 'Comprimir salida',
+        'edit.selectAll': 'Seleccionar todo', 'edit.clearSel': 'Limpiar selecci\u00f3n',
+        'edit.rotate': 'Rotar 90\u00b0', 'edit.delete': 'Eliminar',
+        'edit.dragHint': 'Arrastra las miniaturas para reordenar. Clic para seleccionar. Usa los botones para rotar o eliminar p\u00e1ginas.',
+        'edit.watermark': 'Texto de marca de agua (opcional)',
+        'edit.pageNumbers': 'A\u00f1adir n\u00fameros de p\u00e1gina',
+        'edit.compress': 'Comprimir (object streams)',
+        'account.preferences': 'Preferencias', 'account.language': 'Idioma', 'account.theme': 'Tema',
+        'theme.system': 'Sistema', 'theme.light': 'Claro', 'theme.dark': 'Oscuro',
+        'account.signOut': 'Cerrar sesi\u00f3n',
+        'account.history': 'Actividad reciente',
+        'account.historyEmpty': 'No hay operaciones todav\u00eda. Une o convierte un PDF para verlo aqu\u00ed.',
+        'account.dangerZone': 'Zona de peligro', 'account.deleteAccount': 'Eliminar mi cuenta',
+        'account.deleteHint': 'Esto elimina permanentemente tu cuenta, historial y datos de uso. No se puede deshacer.',
+      },
+    };
+    let currentLang = (localStorage.getItem('lang') || (navigator.language || 'en').slice(0, 2));
+    if (!I18N[currentLang]) currentLang = 'en';
+    function t(key) { return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key; }
+    function applyTranslations() {
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.textContent = t(el.dataset.i18n);
+      });
+      document.documentElement.lang = currentLang;
+    }
 
     let selectedFiles = [];
     let dragSrcIndex = null;
@@ -421,7 +553,11 @@
       profileName.value = currentUser.user_metadata?.name || '';
       profileMsg.classList.add('hidden');
       passwordMsg.classList.add('hidden');
+      deleteMsg.classList.add('hidden');
       newPassword.value = '';
+      // Reflect current prefs in selects.
+      languageSelect.value = currentLang;
+      themeSelect.value = localStorage.getItem('theme') || 'system';
       await refreshUsage();
       if (isPro()) {
         accountUsageEl.textContent = 'Pro plan — unlimited merges.';
@@ -430,6 +566,8 @@
         const reset = usageState.resetsAt ? ` Resets ${formatResetTime(usageState.resetsAt)}.` : '';
         accountUsageEl.textContent = `Free plan — ${remaining} of ${appConfig.freeMergeLimit} merges left in this ${appConfig.usageWindowHours}h window.${reset}`;
       }
+      renderUsageBar();
+      refreshHistory();
       maybeShowAdminSection();
       openModal(accountModal);
     }
@@ -548,10 +686,12 @@
       supabaseClient = window.supabase.createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey);
       const { data } = await supabaseClient.auth.getSession();
       currentUser = data?.session?.user || null;
+      if (currentUser) applyUserPrefs(currentUser);
       updateAccountUI();
       if (currentUser) refreshUsage();
       supabaseClient.auth.onAuthStateChange((event, session) => {
         currentUser = session?.user || null;
+        if (currentUser) applyUserPrefs(currentUser);
         updateAccountUI();
         if (currentUser) {
           closeModal(authModal);
@@ -570,6 +710,7 @@
       });
     }
     initAuth();
+    applyTranslations();
 
     const modeConfig = {
       merge: {
@@ -595,6 +736,19 @@
         minFiles: 1,
         downloadName: 'converted.pdf',
         showOptions: true
+      },
+      edit: {
+        accept: ['application/pdf'],
+        acceptAttr: 'application/pdf',
+        subtitle: 'Upload a single PDF, then reorder, rotate, delete pages, add a watermark or page numbers.',
+        button: 'Apply changes',
+        dropText: 'Drag & drop one PDF here',
+        hint: 'or click to browse',
+        endpoint: '/edit',
+        minFiles: 1,
+        maxFiles: 1,
+        downloadName: 'edited.pdf',
+        showOptions: false
       }
     };
 
@@ -602,6 +756,8 @@
       mode = newMode;
       selectedFiles.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
       selectedFiles = [];
+      editPages = [];
+      editSelection.clear();
       tabs.forEach(tab => {
         const isActive = tab.dataset.mode === mode;
         tab.classList.toggle('active', isActive);
@@ -609,13 +765,19 @@
       });
       const cfg = modeConfig[mode];
       fileInput.accept = cfg.acceptAttr;
+      fileInput.multiple = mode !== 'edit';
       subtitle.textContent = cfg.subtitle;
       actionBtn.textContent = cfg.button;
       dropText.textContent = cfg.dropText;
       dropHint.textContent = cfg.hint;
       optionsBox.classList.toggle('hidden', !cfg.showOptions);
+      mergeCompressRow.classList.toggle('hidden', mode !== 'merge');
+      editPane.classList.add('hidden');
+      outputName.value = '';
+      outputName.placeholder = cfg.downloadName;
       renderFileList();
       hideError();
+      applyTranslations();
     }
 
     tabs.forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
@@ -635,8 +797,47 @@
     dropZone.addEventListener('drop', e => {
       e.preventDefault();
       dropZone.classList.remove('drag-over');
-      addFiles(Array.from(e.dataTransfer.files));
+      // Folder support: recursively walk DataTransferItems.
+      const items = e.dataTransfer.items;
+      if (items && items.length && typeof items[0].webkitGetAsEntry === 'function') {
+        const promises = [];
+        for (const item of items) {
+          const entry = item.webkitGetAsEntry();
+          if (entry) promises.push(walkEntry(entry));
+          else if (item.kind === 'file') {
+            const f = item.getAsFile();
+            if (f) promises.push(Promise.resolve([f]));
+          }
+        }
+        Promise.all(promises).then(arrs => addFiles(arrs.flat()));
+      } else {
+        addFiles(Array.from(e.dataTransfer.files));
+      }
     });
+
+    function walkEntry(entry) {
+      return new Promise(resolve => {
+        if (entry.isFile) {
+          entry.file(f => resolve([f]), () => resolve([]));
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const all = [];
+          const readBatch = () => {
+            reader.readEntries(async entries => {
+              if (!entries.length) return resolve(all);
+              for (const e of entries) {
+                const sub = await walkEntry(e);
+                all.push(...sub);
+              }
+              readBatch();
+            }, () => resolve(all));
+          };
+          readBatch();
+        } else {
+          resolve([]);
+        }
+      });
+    }
 
     fileInput.addEventListener('change', () => {
       addFiles(Array.from(fileInput.files));
@@ -653,6 +854,17 @@
       hideError();
       const accept = modeConfig[mode].accept;
       const skipped = [];
+
+      // In edit mode: only one PDF allowed, replace any existing one and load thumbnails.
+      if (mode === 'edit') {
+        const pdf = files.find(f => f.type === 'application/pdf');
+        if (!pdf) {
+          showError('Please drop a single PDF file.');
+          return;
+        }
+        loadEditPdf(pdf);
+        return;
+      }
 
       for (const file of files) {
         if (!accept.includes(file.type)) {
@@ -687,7 +899,14 @@
 
       if (selectedFiles.length === 0) {
         fileList.classList.add('hidden');
-        actionBtn.disabled = true;
+        actionBtn.disabled = mode !== 'edit' || editPages.length === 0;
+        return;
+      }
+
+      // In edit mode, hide the regular file list (thumbnails serve as the UI).
+      if (mode === 'edit') {
+        fileList.classList.add('hidden');
+        actionBtn.disabled = editPages.length === 0;
         return;
       }
 
@@ -794,7 +1013,14 @@
     actionBtn.addEventListener('click', async () => {
       hideError();
       const cfg = modeConfig[mode];
-      if (selectedFiles.length < cfg.minFiles) {
+
+      // Edit mode validation: must have at least one page after edits.
+      if (mode === 'edit') {
+        if (!editPdfBuffer || editPages.length === 0) {
+          showError('Upload a PDF and keep at least one page.');
+          return;
+        }
+      } else if (selectedFiles.length < cfg.minFiles) {
         showError(`Please select at least ${cfg.minFiles} file${cfg.minFiles > 1 ? 's' : ''}.`);
         return;
       }
@@ -813,12 +1039,32 @@
       const consumedAnon = !!gate.anon;
 
       const formData = new FormData();
-      selectedFiles.forEach(e => formData.append('files', e.file));
+      if (mode === 'edit') {
+        // Build ops payload from current editPages state.
+        const order = editPages.map(p => p.originalIndex);
+        const rotate = {};
+        editPages.forEach(p => { if (p.rotation) rotate[p.originalIndex] = p.rotation; });
+        const ops = {
+          order, rotate,
+          watermark: editWatermark.value.trim() ? { text: editWatermark.value.trim() } : undefined,
+          pageNumbers: editPageNumbers.checked,
+          compress: editCompress.checked,
+        };
+        formData.append('ops', JSON.stringify(ops));
+        // Send the original PDF as the single file.
+        formData.append('files', new Blob([editPdfBuffer], { type: 'application/pdf' }), selectedFiles[0]?.file?.name || 'input.pdf');
+      } else {
+        selectedFiles.forEach(e => formData.append('files', e.file));
+      }
 
       let endpoint = cfg.endpoint;
-      if (mode === 'image2pdf') {
-        endpoint += `?pageSize=${encodeURIComponent(pageSizeSelect.value)}`;
-      }
+      const qs = new URLSearchParams();
+      if (mode === 'image2pdf') qs.set('pageSize', pageSizeSelect.value);
+      if (mode === 'merge' && mergeCompress.checked) qs.set('compress', 'true');
+      const customName = outputName.value.trim();
+      if (customName) qs.set('name', customName);
+      const qstr = qs.toString();
+      if (qstr) endpoint += '?' + qstr;
 
       const xhr = new XMLHttpRequest();
       activeXhr = xhr;
@@ -854,7 +1100,9 @@
           const url = URL.createObjectURL(xhr.response);
           const a = document.createElement('a');
           a.href = url;
-          a.download = cfg.downloadName;
+          a.download = (outputName.value.trim()
+            ? (outputName.value.trim().toLowerCase().endsWith('.pdf') ? outputName.value.trim() : outputName.value.trim() + '.pdf')
+            : cfg.downloadName);
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -910,12 +1158,246 @@
 
     const themeToggle = document.getElementById('themeToggle');
     const storedTheme = localStorage.getItem('theme');
-    if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
+    function applyTheme(pref) {
+      const dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', dark);
     }
+    applyTheme(storedTheme || 'system');
     themeToggle.addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+      const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      applyTheme(next);
+      saveUserPref({ theme: next });
+    });
+
+    // ---- Account-modal v2 wiring (theme/lang dropdowns, history, delete) ----
+    const themeSelect = document.getElementById('themeSelect');
+    const languageSelect = document.getElementById('languageSelect');
+    const usageBar = document.getElementById('usageBar');
+    const usageBarFill = document.getElementById('usageBarFill');
+    const historyList = document.getElementById('historyList');
+    const historyEmpty = document.getElementById('historyEmpty');
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    const deleteMsg = document.getElementById('deleteMsg');
+
+    languageSelect.addEventListener('change', () => {
+      currentLang = languageSelect.value;
+      localStorage.setItem('lang', currentLang);
+      applyTranslations();
+      saveUserPref({ lang: currentLang });
+    });
+    themeSelect.addEventListener('change', () => {
+      const v = themeSelect.value;
+      localStorage.setItem('theme', v);
+      applyTheme(v);
+      saveUserPref({ theme: v });
+    });
+
+    async function saveUserPref(patch) {
+      if (!currentUser || !supabaseClient) return;
+      try {
+        const merged = { ...(currentUser.user_metadata || {}), ...patch };
+        const { data, error } = await supabaseClient.auth.updateUser({ data: merged });
+        if (!error && data?.user) currentUser = data.user;
+      } catch { /* ignore */ }
+    }
+
+    function applyUserPrefs(user) {
+      const m = user?.user_metadata || {};
+      if (m.lang && I18N[m.lang] && m.lang !== currentLang) {
+        currentLang = m.lang;
+        localStorage.setItem('lang', currentLang);
+        applyTranslations();
+      }
+      if (m.theme && ['system', 'light', 'dark'].includes(m.theme)) {
+        localStorage.setItem('theme', m.theme);
+        applyTheme(m.theme);
+      }
+    }
+
+    // Render usage progress bar inside the account modal.
+    function renderUsageBar() {
+      if (!currentUser) { usageBar.classList.add('hidden'); return; }
+      if (isPro()) { usageBar.classList.add('hidden'); return; }
+      const limit = appConfig.freeMergeLimit || 1;
+      const used = limit - (usageState.remaining ?? limit);
+      const pct = Math.min(100, Math.round((used / limit) * 100));
+      usageBarFill.style.width = pct + '%';
+      usageBarFill.classList.toggle('over-half', pct >= 50 && pct < 100);
+      usageBarFill.classList.toggle('full', pct >= 100);
+      usageBar.classList.remove('hidden');
+    }
+
+    async function refreshHistory() {
+      historyList.innerHTML = '';
+      if (!currentUser || !supabaseClient) { historyEmpty.classList.add('hidden'); return; }
+      const { data, error } = await supabaseClient.rpc('list_my_operations', { limit_count: 20 });
+      if (error) { historyEmpty.classList.add('hidden'); return; }
+      if (!data || !data.length) { historyEmpty.classList.remove('hidden'); return; }
+      historyEmpty.classList.add('hidden');
+      data.forEach(row => {
+        const li = document.createElement('li');
+        const left = document.createElement('div');
+        const type = document.createElement('span');
+        type.className = 'h-type';
+        type.textContent = row.op_type;
+        const meta = document.createElement('div');
+        meta.className = 'h-meta';
+        const when = new Date(row.created_at).toLocaleString();
+        meta.textContent = `${when} \u00b7 ${row.file_count} file${row.file_count !== 1 ? 's' : ''} \u00b7 ${row.page_count}p`;
+        left.append(type, meta);
+        const right = document.createElement('div');
+        right.className = 'h-meta';
+        right.textContent = formatSize(row.bytes_out || 0);
+        li.append(left, right);
+        historyList.appendChild(li);
+      });
+    }
+
+    deleteAccountBtn.addEventListener('click', async () => {
+      if (!currentUser || !supabaseClient) return;
+      const confirm1 = prompt('To confirm, type DELETE');
+      if (confirm1 !== 'DELETE') return;
+      deleteMsg.classList.add('hidden');
+      const { error } = await supabaseClient.rpc('delete_my_account');
+      if (error) {
+        deleteMsg.textContent = error.message;
+        deleteMsg.classList.remove('hidden');
+        return;
+      }
+      await supabaseClient.auth.signOut().catch(() => {});
+      closeModal(accountModal);
+      alert('Your account has been deleted.');
+    });
+
+    // ---- Edit-mode (PDF.js thumbnails) ----
+    let pdfjsReady = null;
+    function ensurePdfjs() {
+      if (pdfjsReady) return pdfjsReady;
+      pdfjsReady = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs').then(mod => {
+        mod.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs';
+        return mod;
+      });
+      return pdfjsReady;
+    }
+
+    async function loadEditPdf(file) {
+      try {
+        const buf = await file.arrayBuffer();
+        editPdfBuffer = buf;
+        const pdfjs = await ensurePdfjs();
+        // pdf.js mutates the buffer; pass a copy.
+        const doc = await pdfjs.getDocument({ data: buf.slice(0) }).promise;
+        editPages = [];
+        editSelection.clear();
+        editGrid.innerHTML = '';
+        editPane.classList.remove('hidden');
+        outputName.placeholder = file.name.replace(/\.pdf$/i, '') + '-edited.pdf';
+        // Show action button.
+        selectedFiles = [{ file }]; // for size display; not actually re-uploaded as multipart array of pages
+        renderFileList();
+        for (let i = 0; i < doc.numPages; i++) {
+          const pageNum = i + 1;
+          const page = await doc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 0.4 });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          const entry = { originalIndex: i, rotation: 0, canvas };
+          editPages.push(entry);
+          renderEditThumb(entry);
+        }
+        actionBtn.disabled = editPages.length === 0;
+      } catch (err) {
+        console.error(err);
+        showError('Could not read the PDF for editing.');
+      }
+    }
+
+    function renderEditGrid() {
+      editGrid.innerHTML = '';
+      editPages.forEach(entry => renderEditThumb(entry));
+      actionBtn.disabled = editPages.length === 0;
+    }
+
+    function renderEditThumb(entry) {
+      const div = document.createElement('div');
+      div.className = 'edit-thumb';
+      div.draggable = true;
+      div.dataset.idx = editPages.indexOf(entry);
+      const idxNow = () => editPages.indexOf(entry);
+
+      const c = entry.canvas;
+      c.style.transform = `rotate(${entry.rotation}deg)`;
+      div.appendChild(c);
+
+      const label = document.createElement('div');
+      label.className = 'edit-thumb-label';
+      const num = document.createElement('span');
+      num.textContent = `\u00b7 ${idxNow() + 1}`;
+      const actions = document.createElement('div');
+      actions.className = 'edit-thumb-actions';
+      const rot = document.createElement('button');
+      rot.type = 'button'; rot.title = 'Rotate'; rot.textContent = '\u21bb';
+      rot.addEventListener('click', e => { e.stopPropagation(); entry.rotation = (entry.rotation + 90) % 360; c.style.transform = `rotate(${entry.rotation}deg)`; });
+      const del = document.createElement('button');
+      del.type = 'button'; del.title = 'Delete'; del.textContent = '\u00d7';
+      del.addEventListener('click', e => {
+        e.stopPropagation();
+        const i = editPages.indexOf(entry);
+        if (i >= 0) { editPages.splice(i, 1); editSelection.delete(entry); renderEditGrid(); }
+      });
+      actions.append(rot, del);
+      label.append(num, actions);
+      div.appendChild(label);
+
+      div.addEventListener('click', () => {
+        if (editSelection.has(entry)) { editSelection.delete(entry); div.classList.remove('selected'); }
+        else { editSelection.add(entry); div.classList.add('selected'); }
+      });
+
+      div.addEventListener('dragstart', e => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(idxNow()));
+        div.classList.add('dragging');
+      });
+      div.addEventListener('dragend', () => div.classList.remove('dragging'));
+      div.addEventListener('dragover', e => { e.preventDefault(); div.classList.add('drag-target'); });
+      div.addEventListener('dragleave', () => div.classList.remove('drag-target'));
+      div.addEventListener('drop', e => {
+        e.preventDefault();
+        div.classList.remove('drag-target');
+        const from = Number(e.dataTransfer.getData('text/plain'));
+        const to = idxNow();
+        if (from === to || isNaN(from)) return;
+        const moved = editPages.splice(from, 1)[0];
+        editPages.splice(to, 0, moved);
+        renderEditGrid();
+      });
+
+      if (editSelection.has(entry)) div.classList.add('selected');
+      editGrid.appendChild(div);
+    }
+
+    document.getElementById('editSelectAll').addEventListener('click', () => {
+      editPages.forEach(p => editSelection.add(p));
+      renderEditGrid();
+    });
+    document.getElementById('editClearSel').addEventListener('click', () => {
+      editSelection.clear();
+      renderEditGrid();
+    });
+    document.getElementById('editRotateSel').addEventListener('click', () => {
+      if (!editSelection.size) return;
+      editSelection.forEach(p => p.rotation = (p.rotation + 90) % 360);
+      renderEditGrid();
+    });
+    document.getElementById('editDeleteSel').addEventListener('click', () => {
+      if (!editSelection.size) return;
+      editPages = editPages.filter(p => !editSelection.has(p));
+      editSelection.clear();
+      renderEditGrid();
     });
   </script>
 </body>

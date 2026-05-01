@@ -101,3 +101,52 @@ test("POST /convert rejects file with image extension but non-image content (mag
   assert.strictEqual(res.status, 400);
   assert.match(res.body.error, /not a valid PNG or JPEG/);
 });
+
+test("POST /edit reorders pages via ops.order", async () => {
+  const buf = await makePdfBuffer(3);
+  const ops = JSON.stringify({ order: [2, 1, 0] });
+  const res = await request(app)
+    .post("/edit")
+    .field("ops", ops)
+    .attach("files", buf, "in.pdf");
+  assert.strictEqual(res.status, 200);
+  const out = await PDFDocument.load(res.body);
+  assert.strictEqual(out.getPageCount(), 3);
+});
+
+test("POST /edit rejects out-of-range order index", async () => {
+  const buf = await makePdfBuffer(2);
+  const ops = JSON.stringify({ order: [0, 5] });
+  const res = await request(app)
+    .post("/edit")
+    .field("ops", ops)
+    .attach("files", buf, "in.pdf");
+  assert.strictEqual(res.status, 400);
+});
+
+test("POST /edit rejects invalid rotate angle", async () => {
+  const buf = await makePdfBuffer(1);
+  const ops = JSON.stringify({ order: [0], rotate: { 0: 45 } });
+  const res = await request(app)
+    .post("/edit")
+    .field("ops", ops)
+    .attach("files", buf, "in.pdf");
+  assert.strictEqual(res.status, 400);
+});
+
+test("POST /edit applies watermark and page numbers", async () => {
+  const buf = await makePdfBuffer(2);
+  const ops = JSON.stringify({
+    order: [0, 1],
+    watermark: { text: "DRAFT" },
+    pageNumbers: true,
+    compress: true,
+  });
+  const res = await request(app)
+    .post("/edit")
+    .field("ops", ops)
+    .attach("files", buf, "in.pdf");
+  assert.strictEqual(res.status, 200);
+  const out = await PDFDocument.load(res.body);
+  assert.strictEqual(out.getPageCount(), 2);
+});

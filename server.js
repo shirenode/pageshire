@@ -3,7 +3,7 @@ const express = require("express");
 const multer = require("multer");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const { PDFDocument } = require("pdf-lib");
+const { PDFDocument, StandardFonts, degrees, rgb } = require("pdf-lib");
 const { createClient } = require("@supabase/supabase-js");
 const path = require("path");
 const crypto = require("crypto");
@@ -57,8 +57,9 @@ app.use(
       useDefaults: true,
       directives: {
         "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        "worker-src": ["'self'", "blob:", "https://cdn.jsdelivr.net"],
         "img-src": ["'self'", "data:", "blob:"],
-        "connect-src": ["'self'", ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : []), "https://*.supabase.co"],
+        "connect-src": ["'self'", ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : []), "https://*.supabase.co", "https://cdn.jsdelivr.net"],
         "upgrade-insecure-requests": null,
       },
     },
@@ -165,21 +166,45 @@ setInterval(() => {
   for (const [k, v] of anonUsage) if (v.windowStart < cutoff) anonUsage.delete(k);
 }, 60 * 60 * 1000).unref();
 
+// Build a per-request Supabase client bound to the caller's JWT (or null).
+function supabaseForRequest(req) {
+  const auth = req.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token || !SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+// Fire-and-forget operation log (best effort; failures are logged but don't break the request).
+async function logOp(req, opType, { fileCount = 0, pageCount = 0, bytesIn = 0, bytesOut = 0 } = {}) {
+  const client = req.userClient;
+  if (!client) return;
+  try {
+    await client.rpc("log_operation", {
+      op_type: opType,
+      file_count: fileCount,
+      page_count: pageCount,
+      bytes_in: bytesIn,
+      bytes_out: bytesOut,
+    });
+  } catch (e) {
+    logError(req.id, "log_operation", e);
+  }
+}
+
 async function usageGate(req, res, next) {
   try {
-    const auth = req.get("authorization") || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-
-    if (token && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    const userClient = supabaseForRequest(req);
+    if (userClient) {
       // Authenticated path: call RPC with the user's JWT so RLS + auth.uid() work.
-      const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        global: { headers: { Authorization: `Bearer ${token}` } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
       const { data: userData, error: userErr } = await userClient.auth.getUser();
       if (userErr || !userData?.user) {
         return res.status(401).json({ error: "Invalid or expired session. Please sign in again." });
       }
+      req.userClient = userClient;
+      req.userId = userData.user.id;
       const { data, error } = await userClient.rpc("consume_usage", {
         limit_count: FREE_MERGE_LIMIT,
         window_hours: USAGE_WINDOW_HOURS,
@@ -272,7 +297,8 @@ app.post("/merge", limiter, attachReqId, upload.array("files", MAX_FILES), usage
       const pages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
       for (const page of pages) mergedPdf.addPage(page);
     }
-    const mergedBytes = await mergedPdf.save();
+    const compress = String(req.query.compress || "").toLowerCase() === "true";
+    const mergedBytes = await mergedPdf.save({ useObjectStreams: compress });
 
     const filename = sanitizeFilename(req.query.name, "merged.pdf");
     res.set({
@@ -281,6 +307,12 @@ app.post("/merge", limiter, attachReqId, upload.array("files", MAX_FILES), usage
       "Content-Length": mergedBytes.length,
     });
     res.send(Buffer.from(mergedBytes));
+    logOp(req, "merge", {
+      fileCount: files.length,
+      pageCount: totalPages,
+      bytesIn: totalSize(files),
+      bytesOut: mergedBytes.length,
+    });
   } catch (err) {
     logError(req.id, "merge", err);
     res.status(500).json({ error: "Failed to merge PDFs. Make sure all files are valid." });
@@ -330,9 +362,160 @@ app.post("/convert", limiter, attachReqId, upload.array("files", MAX_FILES), usa
       "Content-Length": pdfBytes.length,
     });
     res.send(Buffer.from(pdfBytes));
+    logOp(req, "convert", {
+      fileCount: files.length,
+      pageCount: pdfDoc.getPageCount(),
+      bytesIn: totalSize(files),
+      bytesOut: pdfBytes.length,
+    });
   } catch (err) {
     logError(req.id, "convert", err);
     res.status(500).json({ error: "Failed to convert images. Make sure all files are valid PNG or JPEG." });
+  }
+});
+
+// --- /edit: page-level operations on a single PDF ---
+// Body: multipart, fields:
+//   files: 1 PDF
+//   ops:   JSON string {
+//            order?: number[]            // 0-based page indices in desired order; pages not listed are dropped
+//            rotate?: { [pageIndex]: 90|180|270 }   // applied AFTER reorder, indices refer to pre-reorder pages
+//            watermark?: { text: string, opacity?: number, fontSize?: number }
+//            pageNumbers?: boolean
+//            compress?: boolean
+//          }
+app.post("/edit", limiter, attachReqId, upload.array("files", 1), usageGate, async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (files.length !== 1) {
+      return res.status(400).json({ error: "Please upload exactly one PDF." });
+    }
+    const file = files[0];
+    if (sniffMime(file.buffer) !== "application/pdf") {
+      return res.status(400).json({ error: `"${file.originalname}" is not a valid PDF.` });
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      return res.status(413).json({ error: "File exceeds the size limit." });
+    }
+
+    let ops = {};
+    if (req.body?.ops) {
+      try { ops = JSON.parse(req.body.ops); } catch {
+        return res.status(400).json({ error: "Invalid ops JSON." });
+      }
+    }
+
+    let source;
+    try {
+      source = await PDFDocument.load(file.buffer, { ignoreEncryption: false });
+    } catch {
+      return res.status(400).json({ error: "Could not parse the PDF. It may be encrypted or corrupted." });
+    }
+    const sourcePageCount = source.getPageCount();
+    if (sourcePageCount > MAX_PAGES_PER_FILE) {
+      return res.status(413).json({ error: `Too many pages (max ${MAX_PAGES_PER_FILE}).` });
+    }
+
+    // Validate order: array of unique 0-based ints, each < sourcePageCount.
+    let order = ops.order;
+    if (Array.isArray(order)) {
+      const seen = new Set();
+      for (const idx of order) {
+        if (!Number.isInteger(idx) || idx < 0 || idx >= sourcePageCount || seen.has(idx)) {
+          return res.status(400).json({ error: "Invalid 'order': must be unique 0-based page indices." });
+        }
+        seen.add(idx);
+      }
+    } else {
+      order = Array.from({ length: sourcePageCount }, (_, i) => i);
+    }
+    if (order.length === 0) {
+      return res.status(400).json({ error: "Cannot delete every page." });
+    }
+
+    // Validate rotate map.
+    const rotate = ops.rotate && typeof ops.rotate === "object" ? ops.rotate : {};
+    for (const [k, v] of Object.entries(rotate)) {
+      const idx = Number(k);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= sourcePageCount) {
+        return res.status(400).json({ error: `Invalid rotate index: ${k}` });
+      }
+      if (![0, 90, 180, 270].includes(v)) {
+        return res.status(400).json({ error: `Invalid rotate angle for page ${k}: must be 0/90/180/270.` });
+      }
+    }
+
+    const out = await PDFDocument.create();
+    const copied = await out.copyPages(source, order);
+    copied.forEach((page, outIdx) => {
+      const sourceIdx = order[outIdx];
+      const angle = rotate[sourceIdx] || 0;
+      if (angle) {
+        const current = page.getRotation().angle || 0;
+        page.setRotation(degrees((current + angle) % 360));
+      }
+      out.addPage(page);
+    });
+
+    // Watermark.
+    if (ops.watermark && typeof ops.watermark.text === "string" && ops.watermark.text.trim()) {
+      const text = ops.watermark.text.slice(0, 100);
+      const opacity = Math.min(1, Math.max(0.05, Number(ops.watermark.opacity) || 0.2));
+      const fontSize = Math.min(120, Math.max(12, Number(ops.watermark.fontSize) || 60));
+      const font = await out.embedFont(StandardFonts.HelveticaBold);
+      const pages = out.getPages();
+      for (const p of pages) {
+        const { width, height } = p.getSize();
+        const tw = font.widthOfTextAtSize(text, fontSize);
+        p.drawText(text, {
+          x: (width - tw) / 2,
+          y: height / 2,
+          size: fontSize,
+          font,
+          color: rgb(0.5, 0.5, 0.5),
+          opacity,
+          rotate: degrees(45),
+        });
+      }
+    }
+
+    // Page numbers.
+    if (ops.pageNumbers === true) {
+      const font = await out.embedFont(StandardFonts.Helvetica);
+      const pages = out.getPages();
+      pages.forEach((p, i) => {
+        const { width } = p.getSize();
+        const label = `${i + 1} / ${pages.length}`;
+        const size = 10;
+        const tw = font.widthOfTextAtSize(label, size);
+        p.drawText(label, {
+          x: (width - tw) / 2,
+          y: 18,
+          size,
+          font,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+      });
+    }
+
+    const compress = ops.compress === true;
+    const outBytes = await out.save({ useObjectStreams: compress });
+    const filename = sanitizeFilename(req.query.name || ops.name, "edited.pdf");
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Length": outBytes.length,
+    });
+    res.send(Buffer.from(outBytes));
+    logOp(req, "edit", {
+      fileCount: 1,
+      pageCount: out.getPageCount(),
+      bytesIn: file.size,
+      bytesOut: outBytes.length,
+    });
+  } catch (err) {
+    logError(req.id, "edit", err);
+    res.status(500).json({ error: "Failed to edit the PDF." });
   }
 });
 
