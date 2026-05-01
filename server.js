@@ -534,7 +534,7 @@ app.use((err, _req, res, _next) => {
 let server;
 if (require.main === module) {
   server = app.listen(PORT, () => {
-    console.log(`PDF Toolbox running at http://localhost:${PORT}`);
+    console.log(`Pageshire running at http://localhost:${PORT}`);
   });
 
   const shutdown = (signal) => {

@@ -1,6 +1,6 @@
-# PDF Toolbox
+# Pageshire
 
-A small Node.js + Express web app to merge PDFs and convert PNG/JPEG images to PDF.
+A friendly Node.js + Express web app for working with PDFs: merge files, convert PNG/JPEG to PDF, and edit pages (reorder, rotate, delete, watermark, page numbers).
 
 ## Features
 
