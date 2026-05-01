@@ -315,7 +315,7 @@ h1 {
 
 .tab-bar {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin: 20px 0 16px;
 }
@@ -929,3 +929,224 @@ select {
 }
 
 
+/* ============================================================
+   v3 UI Polish — brand, sticky CTA, per-mode accent, micro-interactions
+   ============================================================ */
+
+:root {
+  --accent-merge: #6366f1;
+  --accent-merge-hover: #4f46e5;
+  --accent-img: #a855f7;
+  --accent-img-hover: #9333ea;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.10), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  --ring: rgba(99, 102, 241, 0.18);
+}
+:root.dark {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --ring: rgba(99, 102, 241, 0.32);
+}
+
+/* Per-mode accent: body[data-mode="..."] swaps --accent globally */
+body[data-mode="merge"] {
+  --accent: var(--accent-merge);
+  --accent-hover: var(--accent-merge-hover);
+  --ring: rgba(99, 102, 241, 0.22);
+}
+body[data-mode="image2pdf"] {
+  --accent: var(--accent-img);
+  --accent-hover: var(--accent-img-hover);
+  --ring: rgba(168, 85, 247, 0.22);
+}
+body[data-mode="edit"] {
+  --accent: #14b8a6;
+  --accent-hover: #0d9488;
+  --ring: rgba(20, 184, 166, 0.22);
+}
+
+/* Subtle ambient backdrop */
+body {
+  background:
+    radial-gradient(1200px 600px at 0% -10%, rgba(99, 102, 241, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(168, 85, 247, 0.06), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+:root.dark body {
+  background:
+    radial-gradient(1200px 600px at 0% -10%, rgba(99, 102, 241, 0.10), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(168, 85, 247, 0.08), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* Container — slightly more breathing room on wide screens */
+.container { max-width: 640px; }
+
+/* Brand */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+.brand-mark {
+  display: inline-flex;
+  filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.35));
+  transform: translateZ(0);
+}
+.brand-name {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+/* Tabs — icon + label, gradient active state */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 14px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+.tab-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.tab:hover .tab-icon { opacity: 1; transform: scale(1.05); }
+.tab.active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--shadow-md), 0 0 0 4px var(--ring);
+}
+.tab.active .tab-icon { opacity: 1; }
+.tab:focus-visible { box-shadow: 0 0 0 4px var(--ring); }
+
+/* Drop zone — softer, animated empty state */
+.drop-zone {
+  border-width: 2px;
+  border-style: dashed;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.drop-zone:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.drop-zone.drag-over {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--drop-active-bg);
+  transform: scale(1.01);
+  box-shadow: var(--shadow-lg), 0 0 0 6px var(--ring);
+}
+.drop-icon {
+  color: var(--accent) !important;
+  opacity: 0.85;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.drop-zone:hover .drop-icon { transform: translateY(-3px); }
+.drop-zone.drag-over .drop-icon { transform: translateY(-6px) scale(1.1); }
+
+/* Sticky CTA — keep primary action always reachable */
+.sticky-cta {
+  position: sticky;
+  bottom: 0;
+  margin-top: 24px;
+  padding: 14px 0;
+  display: flex;
+  gap: 10px;
+  justify-content: stretch;
+  align-items: center;
+  background: linear-gradient(to top, var(--bg) 60%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 5;
+}
+.sticky-cta .btn-primary {
+  flex: 1;
+  margin-top: 0;
+  box-shadow: var(--shadow-md), 0 0 0 0 var(--ring);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  transition: box-shadow 0.2s, transform 0.1s, filter 0.2s;
+}
+.sticky-cta .btn-primary:hover:not(:disabled) {
+  box-shadow: var(--shadow-lg), 0 0 0 4px var(--ring);
+  filter: brightness(1.05);
+}
+.sticky-cta .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.sticky-cta .btn-primary:disabled {
+  background: var(--disabled-bg);
+  box-shadow: none;
+}
+.sticky-cta .btn-secondary { margin-top: 0; }
+
+/* File list — elevation, smoother row hover */
+.file-list { box-shadow: var(--shadow-sm); }
+.file-list li { transition: background 0.15s, transform 0.15s; }
+.file-list li:hover { background: var(--surface-hover); transform: translateX(2px); }
+.thumb-pdf { color: var(--accent); }
+
+/* Progress bar uses gradient */
+.progress-fill {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 100%);
+}
+
+/* Loader uses accent */
+.loader { border-top-color: var(--accent); }
+
+/* Modals — softer entrance */
+.modal { animation: modalFade 0.18s ease-out; }
+.modal-content { animation: modalRise 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalRise {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Subtitle — slightly softer */
+.subtitle { font-size: 0.95rem; }
+
+/* Header — semantic refinements */
+.header { margin-bottom: 12px; }
+
+/* Tab-bar mobile: collapse labels under 380px */
+@media (max-width: 380px) {
+  .tab-label { display: none; }
+  .tab { padding: 12px; }
+  .tab-icon { width: 22px; height: 22px; }
+}
+
+/* Larger mobile: tighten brand */
+@media (max-width: 600px) {
+  .brand { font-size: 1.35rem; gap: 8px; }
+  .brand-mark svg { width: 24px; height: 24px; }
+  .sticky-cta { flex-direction: row; gap: 8px; padding: 12px 0; }
+  .sticky-cta .btn-secondary { flex: 0 0 auto; padding: 10px 14px; }
+  .action-row { flex-direction: row; }
+}
+
+/* Reduced motion: kill all the polish flourishes */
+@media (prefers-reduced-motion: reduce) {
+  .drop-zone, .file-list li, .tab-icon, .drop-icon,
+  .sticky-cta .btn-primary, .modal, .modal-content {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* High contrast hint legibility */
+.drop-zone-content .hint { color: var(--text-secondary); }
