@@ -1,5 +1,3 @@
-const fs = require("fs");
-const path = require("path");
 const assert = require("assert");
 const { test } = require("node:test");
 const request = require("supertest");
