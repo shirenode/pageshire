@@ -64,7 +64,7 @@
         <p id="dropText">Drag &amp; drop PDF files here</p>
         <p id="dropHint" class="hint">or click to browse PDF files</p>
       </div>
-      <input type="file" id="fileInput" multiple accept="application/pdf" webkitdirectory="false" />
+      <input type="file" id="fileInput" multiple accept=".pdf,application/pdf" webkitdirectory="false" />
     </div>
 
     <!-- Edit-mode pane: page thumbnails + per-page actions -->
@@ -739,7 +739,7 @@
     const modeConfig = {
       merge: {
         accept: ['application/pdf'],
-        acceptAttr: 'application/pdf',
+        acceptAttr: '.pdf,application/pdf',
         subtitle: 'Upload two or more PDF files, reorder them, and merge into one.',
         button: 'Merge PDFs',
         dropText: 'Drag & drop PDF files here',
@@ -751,7 +751,7 @@
       },
       image2pdf: {
         accept: ['image/png', 'image/jpeg'],
-        acceptAttr: 'image/png,image/jpeg',
+        acceptAttr: '.png,.jpg,.jpeg,image/png,image/jpeg',
         subtitle: 'Upload PNG or JPEG images and convert them into a single PDF.',
         button: 'Convert to PDF',
         dropText: 'Drag & drop PNG or JPEG files here',
@@ -763,7 +763,7 @@
       },
       edit: {
         accept: ['application/pdf'],
-        acceptAttr: 'application/pdf',
+        acceptAttr: '.pdf,application/pdf',
         subtitle: 'Upload a single PDF, then reorder, rotate, delete pages, add a watermark or page numbers.',
         button: 'Apply changes',
         dropText: 'Drag & drop one PDF here',
