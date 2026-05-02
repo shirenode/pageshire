@@ -1154,11 +1154,17 @@
           showPaywall(resetsAt);
           if (currentUser) refreshUsage();
         } else {
-          let message = 'Request failed.';
+          let message = `Request failed (HTTP ${xhr.status}).`;
+          if (xhr.status === 413) {
+            message = 'File too large. The server rejected the upload (max 4.5 MB on Vercel Hobby).';
+          } else if (xhr.status === 0) {
+            message = 'Network error or upload was blocked.';
+          }
           try {
             const text = await xhr.response.text();
-            message = JSON.parse(text).error || message;
-          } catch { /* ignore */ }
+            const parsed = JSON.parse(text);
+            if (parsed?.error) message = parsed.error;
+          } catch { /* response wasn't JSON, keep status-based message */ }
           showError(message);
         }
         finishRequest();
