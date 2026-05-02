@@ -5,7 +5,7 @@ const { test } = require("node:test");
 const request = require("supertest");
 const { PDFDocument } = require("pdf-lib");
 process.env.FREE_MERGE_LIMIT = process.env.FREE_MERGE_LIMIT || "10000";
-const { app } = require("../server");
+const { app } = require("../src/server");
 
 async function makePdfBuffer(pageCount = 1) {
   const doc = await PDFDocument.create();

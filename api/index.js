@@ -1,3 +1,3 @@
-// Vercel serverless entry — re-exports the Express app from server.js.
-const { app } = require("../server.js");
+// Vercel serverless entry — re-exports the Express app.
+const { app } = require("../apps/api/src/server.js");
 module.exports = app;

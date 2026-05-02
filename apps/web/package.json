@@ -1,0 +1,6 @@
+{
+  "name": "@pageshire/web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pageshire static frontend (served by @pageshire/api)."
+}
