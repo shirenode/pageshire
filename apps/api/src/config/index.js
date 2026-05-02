@@ -1,6 +1,8 @@
 "use strict";
 
-require("dotenv").config();
+const path = require("path");
+// Load .env from the repo root so the workspace runs from any cwd.
+require("dotenv").config({ path: path.resolve(__dirname, "../../../../.env") });
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_FILE_BYTES = Number(process.env.MAX_FILE_BYTES) || 50 * 1024 * 1024;
