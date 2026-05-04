@@ -1,3 +1,27 @@
+/* ============================================================================
+ * Pageshire — Main Stylesheet
+ *
+ * Organised in this order:
+ *   1. CSS custom properties (light + dark themes)
+ *   2. Reset & base styles
+ *   3. Layout (container, header)
+ *   4. Tabs (mode switcher)
+ *   5. Modal system (generic + auth, paywall, account)
+ *   6. Theme toggle button
+ *   7. Drop zone (file upload area)
+ *   8. File list (selected files, drag-to-reorder)
+ *   9. Buttons & action row
+ *  10. Error banner & spinner
+ *  11. Options panel (output filename, watermark, page numbers)
+ *  12. Progress bar
+ *  13. Accessibility (focus-visible, reduced motion)
+ *  14. Responsive (mobile ≤ 600 px)
+ *  15. Edit-mode pane (PDF.js thumbnails grid)
+ *  16. Usage bar (account modal)
+ *  17. History table (account modal)
+ * ============================================================================ */
+
+/* ---- 1. CSS custom properties: light theme ---- */
 :root {
   --bg: #f0f2f5;
   --text: #1a1a2e;
@@ -22,6 +46,7 @@
   --loader-track: #e5e7eb;
 }
 
+/* ---- 1b. CSS custom properties: dark theme ---- */
 :root.dark {
   --bg: #181a20;
   --text: #e4e6eb;
@@ -46,6 +71,7 @@
   --loader-track: #3a3f4b;
 }
 
+/* ---- 2. Reset & base styles ---- */
 * {
   margin: 0;
   padding: 0;
@@ -62,6 +88,7 @@ body {
   padding: 40px 20px;
 }
 
+/* ---- 3. Layout ---- */
 .container {
   max-width: 600px;
   width: 100%;
@@ -82,7 +109,7 @@ h1 {
   margin-bottom: 32px;
 }
 
-/* Header with toggle */
+/* ---- 3b. Header (title + account/theme action buttons) ---- */
 .header {
   display: flex;
   justify-content: space-between;
@@ -129,7 +156,8 @@ h1 {
   outline-offset: 2px;
 }
 
-/* Modals */
+/* ---- 5. Modal system ---- */
+/* Shared overlay + panel styles used by auth, paywall, and account modals. */
 .modal {
   position: fixed;
   inset: 0;
@@ -341,6 +369,7 @@ h1 {
   border-color: var(--accent);
 }
 
+/* ---- 6. Theme toggle button (sun/moon icon) ---- */
 .theme-toggle {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -364,7 +393,7 @@ h1 {
 :root.dark .icon-sun { display: block; }
 :root.dark .icon-moon { display: none; }
 
-/* Drop zone */
+/* ---- 7. Drop zone (click or drag files here) ---- */
 .drop-zone {
   border: 2px dashed var(--border);
   border-radius: 12px;
@@ -409,7 +438,7 @@ h1 {
   opacity: 0;
 }
 
-/* File list */
+/* ---- 8. File list (selected files, drag-to-reorder) ---- */
 .file-list {
   margin-top: 24px;
   background: var(--surface);
@@ -486,7 +515,7 @@ h1 {
   background: var(--remove-hover-bg);
 }
 
-/* Buttons */
+/* ---- 9. Buttons ---- */
 .btn {
   display: inline-block;
   padding: 12px 28px;
@@ -526,7 +555,7 @@ h1 {
   background: var(--btn-secondary-hover);
 }
 
-/* Error & spinner */
+/* ---- 10. Error banner & loading spinner ---- */
 .error {
   margin-top: 16px;
   padding: 12px 16px;
@@ -568,7 +597,7 @@ h1 {
   outline-offset: 2px;
 }
 
-/* Options panel */
+/* ---- 11. Options panel (output filename, watermark, page numbers) ---- */
 .options {
   display: flex;
   align-items: center;
@@ -658,7 +687,7 @@ h1 {
   outline-offset: 1px;
 }
 
-/* Action row */
+/* ---- 9b. Action row (merge/convert/apply button + cancel) ---- */
 .action-row {
   display: flex;
   gap: 12px;
@@ -667,7 +696,7 @@ h1 {
 .action-row .btn-primary { margin-top: 0; }
 .action-row .btn-secondary { margin-top: 0; padding: 12px 18px; }
 
-/* Progress bar */
+/* ---- 12. Progress bar (upload progress) ---- */
 .progress {
   margin-top: 20px;
   display: flex;
@@ -693,7 +722,7 @@ h1 {
   text-align: center;
 }
 
-/* Drop zone focus */
+/* ---- 13a. Accessibility: focus-visible outlines ---- */
 .drop-zone:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -705,14 +734,14 @@ h1 {
   outline-offset: -2px;
 }
 
-/* Reduced motion */
+/* ---- 13b. Accessibility: reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
   .loader { animation: none; }
   .progress-fill { transition: none; }
   * { transition: none !important; }
 }
 
-/* Mobile */
+/* ---- 14. Responsive: mobile (≤ 600 px) ---- */
 @media (max-width: 600px) {
   body { padding: 16px 12px; }
   h1 { font-size: 1.5rem; }
@@ -752,7 +781,9 @@ h1 {
   .theme-toggle { padding: 10px; }
 }
 
-/* ===== v2 power features ===== */
+/* ============================================================================
+ * 15–17. Extended features
+ * ============================================================================ */
 
 /* Filename + compress row above action button */
 .filename-row {
@@ -783,7 +814,7 @@ h1 {
 }
 .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 
-/* Edit-mode pane */
+/* ---- 15. Edit-mode pane (PDF.js thumbnail grid + toolbar) ---- */
 .edit-pane {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -864,7 +895,7 @@ h1 {
   color: var(--text);
 }
 
-/* Usage progress bar */
+/* ---- 16. Usage progress bar (account modal) ---- */
 .usage-bar {
   height: 8px;
   background: var(--loader-track);

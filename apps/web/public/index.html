@@ -257,6 +257,24 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs" type="module"></script>
 
   <script>
+    // =========================================================================
+    // Pageshire — Client-side application logic
+    //
+    // This single inline script handles the entire frontend:
+    //  • DOM references & state variables
+    //  • Internationalisation (i18n) for English & Spanish
+    //  • Tab switching between Merge / Image→PDF / Edit modes
+    //  • Drag-and-drop file uploads (including folder recursion)
+    //  • File list rendering with reorder / remove UI
+    //  • Edit mode: PDF.js thumbnail rendering, page reorder/rotate/delete
+    //  • Auth (sign in / sign up / password reset) via Supabase Auth
+    //  • Usage tracking & paywall modal (free-tier limits)
+    //  • Account modal: profile, password change, history, admin, delete
+    //  • XHR upload with progress bar + download of the resulting PDF
+    //  • Dark/light theme toggle with localStorage persistence
+    // =========================================================================
+
+    // ---- DOM element references ----
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
@@ -277,7 +295,8 @@
     const pageSizeSelect = document.getElementById('pageSize');
     const tabs = document.querySelectorAll('.tab');
 
-    // ---- v2 elements & state ----
+    // ---- Edit-mode elements & state ----
+    // These are only used when the user is in the "Edit PDF" tab.
     const outputName = document.getElementById('outputName');
     const mergeCompressRow = document.getElementById('mergeCompressRow');
     const mergeCompress = document.getElementById('mergeCompress');
@@ -286,11 +305,13 @@
     const editWatermark = document.getElementById('editWatermark');
     const editPageNumbers = document.getElementById('editPageNumbers');
     const editCompress = document.getElementById('editCompress');
-    let editPdfBuffer = null;        // ArrayBuffer of the uploaded PDF
-    let editPages = [];              // [{ originalIndex, rotation, canvas }]
-    let editSelection = new Set();   // current selected indices into editPages
+    let editPdfBuffer = null;        // ArrayBuffer of the uploaded PDF (kept for re-upload to server)
+    let editPages = [];              // Array of { originalIndex, rotation, canvas } for each page
+    let editSelection = new Set();   // Currently selected page entries (for bulk rotate/delete)
 
-    // ---- i18n ----
+    // ---- Internationalisation (i18n) ----
+    // Simple key-value translation maps for English and Spanish.
+    // The active language is stored in localStorage and synced to user_metadata.
     const I18N = {
       en: {
         'tab.merge': 'Merge PDFs', 'tab.image2pdf': 'Image \u2192 PDF', 'tab.edit': 'Edit PDF',
@@ -339,19 +360,23 @@
       document.documentElement.lang = currentLang;
     }
 
+    // Selected files array (Merge / Convert modes) and drag-and-drop state.
     let selectedFiles = [];
     let dragSrcIndex = null;
-    let mode = 'merge';
-    let activeXhr = null;
+    let mode = 'merge';      // Current active tab: 'merge' | 'image2pdf' | 'edit'
+    let activeXhr = null;     // Reference to the in-flight XMLHttpRequest (if any)
 
+    // Maximum total upload size (mirrored from server config for client-side validation).
     const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
 
     // ---- Auth + paywall state ----
+    // appConfig is fetched from GET /config on page load and provides the
+    // Supabase URL/key, free-tier limits, and upgrade URL.
     let appConfig = { supabaseUrl: '', supabaseAnonKey: '', freeMergeLimit: 2, usageWindowHours: 24, upgradeUrl: '' };
-    let supabaseClient = null;
-    let currentUser = null;
-    let usageState = { used: 0, remaining: null, resetsAt: null, isPro: false };
-    const ANON_USAGE_KEY = 'pdfToolbox.anonMergeCount';
+    let supabaseClient = null;   // Supabase JS client (initialised in initAuth)
+    let currentUser = null;       // The currently signed-in Supabase user (or null)
+    let usageState = { used: 0, remaining: null, resetsAt: null, isPro: false }; // Server-side usage
+    const ANON_USAGE_KEY = 'pdfToolbox.anonMergeCount'; // localStorage key for anonymous usage
 
     const accountBtn = document.getElementById('accountBtn');
     const accountLabel = document.getElementById('accountLabel');
@@ -370,7 +395,8 @@
     const paywallSignIn = document.getElementById('paywallSignIn');
     const paywallUpgrade = document.getElementById('paywallUpgrade');
 
-    let authMode = 'signin'; // 'signin' | 'signup'
+    let authMode = 'signin'; // 'signin' | 'signup' — controls which form the auth modal shows
+    /** Toggle the auth modal between sign-in and sign-up modes. */
     function setAuthMode(m) {
       authMode = m;
       if (m === 'signin') {
@@ -392,16 +418,20 @@
     }
     authToggleBtn.addEventListener('click', () => setAuthMode(authMode === 'signin' ? 'signup' : 'signin'));
 
+    /** Get the anonymous merge count from localStorage. */
     function getMergeCount() {
       return Number(localStorage.getItem(ANON_USAGE_KEY) || 0);
     }
+    /** Increment the anonymous merge counter in localStorage. */
     function incrementMergeCount() {
       localStorage.setItem(ANON_USAGE_KEY, String(getMergeCount() + 1));
     }
+    /** Check if the current user has a Pro subscription. */
     function isPro() {
       if (usageState.isPro) return true;
       return !!(currentUser && (currentUser.user_metadata?.pro || currentUser.app_metadata?.pro));
     }
+    /** Fetch the latest usage stats from the server via Supabase RPC. */
     async function refreshUsage() {
       if (!currentUser || !supabaseClient) return;
       const { data, error } = await supabaseClient.rpc('get_usage', {
@@ -420,6 +450,11 @@
         updateAccountUI();
       }
     }
+    /**
+     * Pre-flight usage check (client-side only).
+     * The server is the real source of truth — this just prevents
+     * unnecessary uploads when the user has clearly hit their limit.
+     */
     async function tryConsumeUsage() {
       // Pre-flight only: server is the source of truth and will atomically increment.
       if (!currentUser) {
@@ -432,6 +467,7 @@
       }
       return { allowed: true };
     }
+    /** Format an ISO timestamp as a human-readable relative time (e.g. "in 2h 15m"). */
     function formatResetTime(iso) {
       if (!iso) return '';
       const d = new Date(iso);
@@ -444,6 +480,7 @@
       return `in ${mins}m`;
     }
 
+    // ---- Modal open/close helpers ----
     function openModal(el) { el.classList.remove('hidden'); }
     function closeModal(el) { el.classList.add('hidden'); }
     document.querySelectorAll('[data-close-modal]').forEach(btn => {
@@ -453,6 +490,7 @@
       m.addEventListener('click', e => { if (e.target === m) closeModal(m); });
     });
 
+    /** Update the account button label/tooltip based on auth state. */
     function updateAccountUI() {
       if (currentUser) {
         const name = currentUser.user_metadata?.name;
@@ -479,6 +517,7 @@
       setTimeout(() => authEmail.focus(), 50);
     });
 
+    // ---- Auth form submission (sign in / sign up) ----
     authForm.addEventListener('submit', async e => {
       e.preventDefault();
       if (!supabaseClient) {
@@ -512,6 +551,7 @@
       // onAuthStateChange will close the modal once a session exists.
     });
 
+    // ---- Password reset ("Forgot password?") ----
     document.getElementById('authForgotBtn').addEventListener('click', async () => {
       if (!supabaseClient) return;
       const email = authEmail.value.trim();
@@ -530,6 +570,7 @@
       authMsg.classList.remove('hidden');
     });
 
+    // ---- Paywall modal actions ----
     paywallSignIn.addEventListener('click', () => {
       closeModal(paywallModal);
       openModal(authModal);
@@ -543,6 +584,10 @@
       }
     });
 
+    /**
+     * Show the paywall modal when the user has exhausted their free merges.
+     * Displays different copy depending on whether the user is signed in.
+     */
     function showPaywall(serverDeniedResetsAt) {
       let sub;
       if (serverDeniedResetsAt) {
@@ -557,7 +602,7 @@
       openModal(paywallModal);
     }
 
-    // ---- Account modal ----
+    // ---- Account modal (profile, password, usage, history, admin, delete) ----
     const accountModal = document.getElementById('accountModal');
     const accountEmailEl = document.getElementById('accountEmail');
     const accountUsageEl = document.getElementById('accountUsage');
@@ -571,6 +616,7 @@
     const passwordMsg = document.getElementById('passwordMsg');
     const signOutBtn = document.getElementById('signOutBtn');
 
+    /** Open the account modal and populate it with the user's data. */
     async function openAccountModal() {
       if (!currentUser) return;
       accountEmailEl.textContent = currentUser.email || '';
@@ -596,6 +642,7 @@
       openModal(accountModal);
     }
 
+    // ---- Profile name update ----
     profileForm.addEventListener('submit', async e => {
       e.preventDefault();
       profileMsg.classList.add('hidden');
@@ -614,6 +661,7 @@
       profileMsg.classList.remove('hidden');
     });
 
+    // ---- Password change ----
     passwordForm.addEventListener('submit', async e => {
       e.preventDefault();
       passwordMsg.classList.add('hidden');
@@ -629,12 +677,13 @@
       passwordMsg.classList.remove('hidden');
     });
 
+    // ---- Sign out ----
     signOutBtn.addEventListener('click', async () => {
       await supabaseClient.auth.signOut();
       closeModal(accountModal);
     });
 
-    // ---- Admin management ----
+    // ---- Admin management section (visible only to admin users) ----
     const adminSection = document.getElementById('adminSection');
     const adminList = document.getElementById('adminList');
     const adminAddForm = document.getElementById('adminAddForm');
@@ -698,6 +747,11 @@
       refreshAdmins();
     }
 
+    /**
+     * Initialise Supabase auth on page load.
+     * Fetches /config for Supabase credentials, creates the client,
+     * restores any existing session, and listens for auth state changes.
+     */
     async function initAuth() {
       try {
         const res = await fetch('/config');
@@ -736,6 +790,8 @@
     initAuth();
     applyTranslations();
 
+    // ---- Mode configuration ----
+    // Defines per-mode settings: accepted file types, endpoint, copy text, etc.
     const modeConfig = {
       merge: {
         accept: ['application/pdf'],
@@ -776,6 +832,7 @@
       }
     };
 
+    /** Switch the active tool mode (merge / image2pdf / edit). Resets file state. */
     function setMode(newMode) {
       mode = newMode;
       document.body.dataset.mode = mode;
@@ -806,6 +863,7 @@
       applyTranslations();
     }
 
+    // ---- Tab keyboard navigation (arrow keys) ----
     tabs.forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
     document.querySelector('.tab-bar').addEventListener('keydown', e => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -817,6 +875,7 @@
       e.preventDefault();
     });
 
+    // ---- Drop zone event handlers (click, keyboard, drag & drop) ----
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -850,6 +909,10 @@
       }
     });
 
+    /**
+     * Recursively walk a DataTransferItem entry (file or directory).
+     * Returns a flat array of File objects found within.
+     */
     function walkEntry(entry) {
       return new Promise(resolve => {
         if (entry.isFile) {
@@ -885,6 +948,10 @@
       renderFileList();
     });
 
+    /**
+     * Add files to the selected list, filtering by accepted MIME types.
+     * In edit mode only one PDF is accepted; in other modes duplicates are skipped.
+     */
     function addFiles(files) {
       hideError();
       const accept = modeConfig[mode].accept;
@@ -921,6 +988,7 @@
       renderFileList();
     }
 
+    /** Move a file from one position to another in the selected list. */
     function moveFile(from, to) {
       if (to < 0 || to >= selectedFiles.length || from === to) return;
       const moved = selectedFiles.splice(from, 1)[0];
@@ -928,6 +996,7 @@
       renderFileList(to);
     }
 
+    /** Render the file list UI (merge/convert) or enable the action button (edit). */
     function renderFileList(focusIndex) {
       fileItems.innerHTML = '';
       const total = selectedFiles.reduce((s, e) => s + e.file.size, 0);
@@ -1045,6 +1114,7 @@
         selectedFiles.length < modeConfig[mode].minFiles || total > MAX_TOTAL_BYTES;
     }
 
+    // ---- Main action button: triggers upload + server-side processing ----
     actionBtn.addEventListener('click', async () => {
       hideError();
       const cfg = modeConfig[mode];
@@ -1176,8 +1246,10 @@
       xhr.send(formData);
     });
 
+    // ---- Cancel button: abort the in-flight XHR ----
     cancelBtn.addEventListener('click', () => { if (activeXhr) activeXhr.abort(); });
 
+    /** Reset UI state after a request completes (success, error, or cancel). */
     function finishRequest() {
       activeXhr = null;
       cancelBtn.classList.add('hidden');
@@ -1185,18 +1257,21 @@
       actionBtn.disabled = selectedFiles.length < modeConfig[mode].minFiles;
     }
 
+    /** Format a byte count as a human-readable string (B / KB / MB). */
     function formatSize(bytes) {
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
+    /** Show an error message banner above the action button. */
     function showError(msg) {
       errorMsg.textContent = msg;
       errorMsg.classList.remove('hidden');
     }
     function hideError() { errorMsg.classList.add('hidden'); }
 
+    // ---- Dark / light theme toggle ----
     const themeToggle = document.getElementById('themeToggle');
     const storedTheme = localStorage.getItem('theme');
     function applyTheme(pref) {
@@ -1211,7 +1286,7 @@
       saveUserPref({ theme: next });
     });
 
-    // ---- Account-modal v2 wiring (theme/lang dropdowns, history, delete) ----
+    // ---- Account modal: preference dropdowns, usage bar, history, delete ----
     const themeSelect = document.getElementById('themeSelect');
     const languageSelect = document.getElementById('languageSelect');
     const usageBar = document.getElementById('usageBar');
@@ -1234,6 +1309,7 @@
       saveUserPref({ theme: v });
     });
 
+    /** Persist a user preference (lang/theme) to Supabase user_metadata. */
     async function saveUserPref(patch) {
       if (!currentUser || !supabaseClient) return;
       try {
@@ -1243,6 +1319,7 @@
       } catch { /* ignore */ }
     }
 
+    /** Apply the user's stored preferences (language, theme) on login. */
     function applyUserPrefs(user) {
       const m = user?.user_metadata || {};
       if (m.lang && I18N[m.lang] && m.lang !== currentLang) {
@@ -1256,7 +1333,8 @@
       }
     }
 
-    // Render usage progress bar inside the account modal.
+    /** Render the usage progress bar inside the account modal. */
+    // Shows how much of the free-tier quota has been consumed.
     function renderUsageBar() {
       if (!currentUser) { usageBar.classList.add('hidden'); return; }
       if (isPro()) { usageBar.classList.add('hidden'); return; }
@@ -1269,6 +1347,7 @@
       usageBar.classList.remove('hidden');
     }
 
+    /** Fetch and render the user's recent operation history from Supabase. */
     async function refreshHistory() {
       historyList.innerHTML = '';
       if (!currentUser || !supabaseClient) { historyEmpty.classList.add('hidden'); return; }
@@ -1295,6 +1374,8 @@
       });
     }
 
+    // ---- Account deletion (danger zone) ----
+    // Requires the user to type "DELETE" to confirm.
     deleteAccountBtn.addEventListener('click', async () => {
       if (!currentUser || !supabaseClient) return;
       const confirm1 = prompt('To confirm, type DELETE');
@@ -1311,8 +1392,11 @@
       alert('Your account has been deleted.');
     });
 
-    // ---- Edit-mode (PDF.js thumbnails) ----
+    // ---- Edit-mode: PDF.js thumbnails ----
+    // Lazy-loads PDF.js from the CDN and uses it to render page thumbnails
+    // so the user can visually reorder, rotate, and delete pages.
     let pdfjsReady = null;
+    /** Lazy-load the PDF.js library and configure its web worker. */
     function ensurePdfjs() {
       if (pdfjsReady) return pdfjsReady;
       pdfjsReady = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs').then(mod => {
@@ -1322,6 +1406,11 @@
       return pdfjsReady;
     }
 
+    /**
+     * Load a PDF file into edit mode: render page thumbnails into a grid.
+     * The original ArrayBuffer is kept in `editPdfBuffer` and re-sent to
+     * the server when the user clicks "Apply changes".
+     */
     async function loadEditPdf(file) {
       try {
         const buf = await file.arrayBuffer();
@@ -1356,12 +1445,14 @@
       }
     }
 
+    /** Re-render the entire thumbnail grid (called after reorder/delete). */
     function renderEditGrid() {
       editGrid.innerHTML = '';
       editPages.forEach(entry => renderEditThumb(entry));
       actionBtn.disabled = editPages.length === 0;
     }
 
+    /** Render a single page thumbnail card with rotate/delete buttons and drag support. */
     function renderEditThumb(entry) {
       const div = document.createElement('div');
       div.className = 'edit-thumb';
@@ -1421,6 +1512,7 @@
       editGrid.appendChild(div);
     }
 
+    // ---- Edit toolbar buttons (select all, clear, rotate selection, delete selection) ----
     document.getElementById('editSelectAll').addEventListener('click', () => {
       editPages.forEach(p => editSelection.add(p));
       renderEditGrid();

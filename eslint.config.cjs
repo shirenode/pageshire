@@ -1,4 +1,12 @@
-// Flat config for ESLint v10.
+/**
+ * ESLint v10 flat configuration for the Pageshire monorepo.
+ *
+ * - API code (Node/CommonJS): apps/api/ and the Vercel entry point api/.
+ *   Uses Node globals; allows console.log; ignores unused args prefixed with _.
+ * - Web code (browser scripts): apps/web/public/.
+ *   Uses browser globals with the same relaxed rules.
+ * - Ignores: node_modules, minified files, and the vendor CSS folder.
+ */
 const js = require("@eslint/js");
 const globals = require("globals");
 
