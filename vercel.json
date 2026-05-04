@@ -1,4 +1,8 @@
 {
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": "npm install",
+  "outputDirectory": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ],
