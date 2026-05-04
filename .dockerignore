@@ -1,0 +1,36 @@
+# Build artifacts and dev files we don't want in the image
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/build
+**/coverage
+**/.cache
+
+# VCS / editor / OS
+.git
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+
+# Local env / logs
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+
+# Vercel / CI
+.vercel
+api/
+
+# Tests / docs
+**/test
+**/__tests__
+*.md
+docs
+
+# Misc
+db

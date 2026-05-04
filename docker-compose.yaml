@@ -1,0 +1,31 @@
+services:
+  pageshire:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pageshire:latest
+    container_name: pageshire
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      FREE_MERGE_LIMIT: ${FREE_MERGE_LIMIT:-2}
+      USAGE_WINDOW_HOURS: ${USAGE_WINDOW_HOURS:-24}
+      UPGRADE_URL: ${UPGRADE_URL:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
